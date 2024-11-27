@@ -93,7 +93,7 @@ print = logger.info
 
 pickle.dump({'args': args}, open(meta_file, "wb"))
 
-device = torch.device('cuda' if args.cuda else 'cpu')
+device = torch.device('cuda:1' if args.cuda else 'cpu')
 
 dataset = utils.StateTransitionsDataset(
     hdf5_file=args.dataset)
@@ -101,7 +101,7 @@ train_loader = data.DataLoader(
     dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
 # Get data sample
-obs = train_loader.__iter__().next()[0]
+obs = next(train_loader.__iter__())[0]
 input_shape = obs[0].size()
 
 model = modules.ContrastiveSWM(

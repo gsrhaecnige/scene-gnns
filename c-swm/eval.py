@@ -51,7 +51,7 @@ eval_loader = data.DataLoader(
     dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
 # Get data sample
-obs = eval_loader.__iter__().next()[0]
+obs = next(eval_loader.__iter__())[0]
 input_shape = obs[0][0].size()
 
 model = modules.ContrastiveSWM(

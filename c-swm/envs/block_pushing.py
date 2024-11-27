@@ -3,9 +3,9 @@
 import numpy as np
 
 import utils
-import gym
-from gym import spaces
-from gym.utils import seeding
+import gymnasium as gym
+from gymnasium import spaces
+import numpy.random as nr
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -13,29 +13,29 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
 
+from typing import Dict, List, Union, Any, Optional, Tuple
 
 import skimage
 
-
-def square(r0, c0, width, im_size):
+def square(r0: int, c0: int, width: int, im_size: Tuple[int, int]) -> Tuple[np.ndarray, np.ndarray]:
     rr, cc = [r0, r0 + width, r0 + width, r0], [c0, c0, c0 + width, c0 + width]
     return skimage.draw.polygon(rr, cc, im_size)
 
 
-def triangle(r0, c0, width, im_size):
+def triangle(r0: int, c0: int, width: int, im_size: Tuple[int, int]) -> Tuple[np.ndarray, np.ndarray]:
     rr, cc = [r0, r0 + width, r0 + width], [c0 + width//2, c0, c0 + width]
     return skimage.draw.polygon(rr, cc, im_size)
 
 
-def fig2rgb_array(fig):
+def fig2rgb_array(fig: plt.Figure) -> np.ndarray:
     fig.canvas.draw()
     buffer = fig.canvas.tostring_rgb()
     width, height = fig.canvas.get_width_height()
     return np.fromstring(buffer, dtype=np.uint8).reshape(height, width, 3)
 
 
-def render_cubes(positions, width):
-    voxels = np.zeros((width, width, width), dtype=np.bool)
+def render_cubes(positions: List[List[int]], width: int) -> np.ndarray:
+    voxels = np.zeros((width, width, width), dtype=bool)
     colors = np.empty(voxels.shape, dtype=object)
 
     cols = ['purple', 'green', 'orange', 'blue', 'brown']
@@ -46,10 +46,10 @@ def render_cubes(positions, width):
 
     fig = plt.figure()
     ax = Axes3D(fig)
-    ax.w_zaxis.set_pane_color((0.5, 0.5, 0.5, 1.0))
-    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
-    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
-    ax.w_zaxis.line.set_lw(0.)
+    ax.zaxis.set_pane_color((0.5, 0.5, 0.5, 1.0))
+    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+    ax.zaxis.line.set_lw(0.)
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_zticks([])
@@ -65,8 +65,23 @@ def render_cubes(positions, width):
 class BlockPushing(gym.Env):
     """Gym environment for block pushing task."""
 
-    def __init__(self, width=5, height=5, render_type='cubes', num_objects=5,
-                 seed=None):
+    def __init__(
+        self,
+        width: int = 5,
+        height: int = 5,
+        render_type: str = 'cubes',
+        num_objects: int = 5,
+        seed: Optional[int] = None
+    ) -> None:
+        """Constructor.
+
+        Args:
+            width: Width of the environment.
+            height: Height of the environment.
+            render_type: Type of rendering ('grid', 'circles', 'shapes', 'cubes').
+            num_objects: Number of objects in environment.
+            seed: Random seed.
+        """
         self.width = width
         self.height = height
         self.render_type = render_type
@@ -94,14 +109,37 @@ class BlockPushing(gym.Env):
             dtype=np.float32
         )
 
-        self.seed(seed)
-        self.reset()
+        super().reset(seed=seed)
 
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        """Reset environment."""
+        super().reset(seed=seed)
+
+        self.objects = [[-1, -1] for _ in range(self.num_objects)]
+
+        # Randomize object position.
+        for i in range(len(self.objects)):
+            # Resample to ensure objects don't fall on same spot.
+            while not self.valid_pos(self.objects[i], i):
+                self.objects[i] = [
+                    self.np_random.integers(self.width),
+                    self.np_random.integers(self.height)
+                ]
+
+        state_obs = (self.get_state(), self.render())
+        return state_obs, {}
+
+    def seed(self, seed: Optional[int] = None) -> List[int]:
+        """Set the seed for all random number generators."""
+        self.np_random, seed = nr.RandomState(seed)
         return [seed]
 
-    def render(self):
+    def render(self, mode: str = 'rgb_array') -> np.ndarray:
+        """Render environment."""
         if self.render_type == 'grid':
             im = np.zeros((3, self.width, self.height))
             for idx, pos in enumerate(self.objects):
@@ -110,16 +148,16 @@ class BlockPushing(gym.Env):
         elif self.render_type == 'circles':
             im = np.zeros((self.width*10, self.height*10, 3), dtype=np.float32)
             for idx, pos in enumerate(self.objects):
-                rr, cc = skimage.draw.circle(
-                    pos[0]*10 + 5, pos[1]*10 + 5, 5, im.shape)
+                rr, cc = skimage.draw.disk(
+                    (pos[0]*10 + 5, pos[1]*10 + 5), 5, shape=im.shape)
                 im[rr, cc, :] = self.colors[idx][:3]
             return im.transpose([2, 0, 1])
         elif self.render_type == 'shapes':
             im = np.zeros((self.width*10, self.height*10, 3), dtype=np.float32)
             for idx, pos in enumerate(self.objects):
                 if idx % 3 == 0:
-                    rr, cc = skimage.draw.circle(
-                        pos[0]*10 + 5, pos[1]*10 + 5, 5, im.shape)
+                    rr, cc = skimage.draw.disk(
+                        (pos[0]*10 + 5, pos[1]*10 + 5), 5, shape=im.shape)
                     im[rr, cc, :] = self.colors[idx][:3]
                 elif idx % 3 == 1:
                     rr, cc = triangle(
@@ -134,31 +172,15 @@ class BlockPushing(gym.Env):
             im = render_cubes(self.objects, self.width)
             return im.transpose([2, 0, 1])
 
-    def get_state(self):
+    def get_state(self) -> np.ndarray:
+        """Get state."""
         im = np.zeros(
             (self.num_objects, self.width, self.height), dtype=np.int32)
         for idx, pos in enumerate(self.objects):
             im[idx, pos[0], pos[1]] = 1
         return im
 
-    def reset(self):
-
-        self.objects = [[-1, -1] for _ in range(self.num_objects)]
-
-        # Randomize object position.
-        for i in range(len(self.objects)):
-
-            # Resample to ensure objects don't fall on same spot.
-            while not self.valid_pos(self.objects[i], i):
-                self.objects[i] = [
-                    np.random.choice(np.arange(self.width)),
-                    np.random.choice(np.arange(self.height))
-                ]
-
-        state_obs = (self.get_state(), self.render())
-        return state_obs
-
-    def valid_pos(self, pos, obj_id):
+    def valid_pos(self, pos: List[int], obj_id: int) -> bool:
         """Check if position is valid."""
         if pos[0] < 0 or pos[0] >= self.width:
             return False
@@ -175,14 +197,14 @@ class BlockPushing(gym.Env):
 
         return True
 
-    def valid_move(self, obj_id, offset):
+    def valid_move(self, obj_id: int, offset: List[int]) -> bool:
         """Check if move is valid."""
         old_pos = self.objects[obj_id]
         new_pos = [p + o for p, o in zip(old_pos, offset)]
         return self.valid_pos(new_pos, obj_id)
 
-    def translate(self, obj_id, offset):
-        """"Translate object pixel.
+    def translate(self, obj_id: int, offset: List[int]) -> None:
+        """Translate object pixel.
 
         Args:
             obj_id: ID of object.
@@ -193,10 +215,14 @@ class BlockPushing(gym.Env):
             self.objects[obj_id][0] += offset[0]
             self.objects[obj_id][1] += offset[1]
 
-    def step(self, action):
-
+    def step(
+        self,
+        action: int
+    ) -> Tuple[Tuple[np.ndarray, np.ndarray], float, bool, bool, Dict[str, Any]]:
+        """Environment step."""
         done = False
         reward = 0
+        truncated = False
 
         directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
@@ -206,4 +232,4 @@ class BlockPushing(gym.Env):
 
         state_obs = (self.get_state(), self.render())
 
-        return state_obs, reward, done, None
+        return state_obs, reward, done, truncated, {}
