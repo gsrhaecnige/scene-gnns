@@ -99,7 +99,9 @@ def train_model(args):
                 torch.save(model.state_dict(), f)
 
 @app.local_entrypoint()
-def main(dataset: str, encoder: str, embedding_dim: int, num_objects: int, ignore_action: bool, name: str):
+# def main(dataset: str, encoder: str, embedding_dim: int, num_objects: int, ignore_action: bool, name: str):
+def main():
+    
 	import argparse
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--batch-size', type=int, default=1024,
@@ -154,5 +156,6 @@ def main(dataset: str, encoder: str, embedding_dim: int, num_objects: int, ignor
 	args.cuda = not args.no_cuda and torch.cuda.is_available()
 	args.model_file = os.path.join(args.save_folder, f"{args.name}_model.pt")
 	os.makedirs(args.save_folder, exist_ok=True)
+	train_model.remote({"dataset": "data/balls_train.h5", "encoder": "medium", "name": "balls", "ignore-action": False, })
 
 	train_model.remote(args)
