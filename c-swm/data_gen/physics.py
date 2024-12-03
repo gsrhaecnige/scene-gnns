@@ -1,3 +1,15 @@
+import sys
+import os
+import h5py
+
+
+# Get env directory
+from pathlib import Path
+if str(Path.cwd()) not in sys.path:
+    sys.path.insert(0, str(Path.cwd()))
+
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'envs')))
+
 from envs import physics_sim
 import numpy as np
 import argparse

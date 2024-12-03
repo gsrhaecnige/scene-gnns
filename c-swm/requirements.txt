@@ -28,6 +28,6 @@ scipy==1.13.1
 six==1.16.0
 sympy==1.13.3
 tifffile==2024.8.30
-torch==2.2.2
+pytorch==2.2.2
 typing_extensions==4.12.2
 zipp==3.21.0

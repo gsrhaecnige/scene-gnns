@@ -94,7 +94,8 @@ def generate_3_body_problem_dataset(dest,
         (x_train, y_train), (
         x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
-    from skimage.draw import circle
+    # from skimage.draw import circle
+    from skimage.draw import disk
     from skimage.transform import resize
 
     if img_size is None:
@@ -152,8 +153,9 @@ def generate_3_body_problem_dataset(dest,
                                          dtype=np.float32)
 
                 for j, pos in enumerate(poss):
-                    rr, cc = circle(int(pos[1] * scale), int(pos[0] * scale),
-                                    radius * scale, scaled_img_size)
+                    # rr, cc = circle(int(pos[1] * scale), int(pos[0] * scale),
+                    #                 radius * scale, scaled_img_size)
+                    rr, cc = disk((int(pos[1] * scale), int(pos[0] * scale)), radius * scale, shape=scaled_img_size)
                     if color:
                         frame[rr, cc, 2 - j] = 1.0
                     else:
