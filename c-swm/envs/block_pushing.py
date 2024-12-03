@@ -12,10 +12,12 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
+from PIL.Image import Resampling
 
 from typing import Dict, List, Union, Any, Optional, Tuple
 
 import skimage
+
 
 def square(r0: int, c0: int, width: int, im_size: Tuple[int, int]) -> Tuple[np.ndarray, np.ndarray]:
     rr, cc = [r0, r0 + width, r0 + width, r0], [c0, c0, c0 + width, c0 + width]
@@ -58,7 +60,7 @@ def render_cubes(positions: List[List[int]], width: int) -> np.ndarray:
     im = fig2rgb_array(fig)
     plt.close(fig)
     im = np.array(  # Crop and resize
-        Image.fromarray(im[215:455, 80:570]).resize((50, 50), Image.ANTIALIAS))
+        Image.fromarray(im[215:455, 80:570]).resize((50, 50), Resampling.LANCZOS))
     return im / 255.
 
 
