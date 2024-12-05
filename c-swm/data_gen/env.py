@@ -11,6 +11,7 @@ if str(Path.cwd()) not in sys.path:
     sys.path.insert(0, str(Path.cwd()))
 
 import argparse
+import ale_py
 
 # noinspection PyUnresolvedReferences
 import envs
@@ -24,7 +25,6 @@ import numpy as np
 from PIL import Image
 from PIL.Image import Resampling
 from typing import Dict, List, Tuple, Optional, Any, Union
-
 
 class RandomAgent(object):
     """The world's simplest agent!"""
@@ -57,6 +57,10 @@ if __name__ == '__main__':
                         help='Random seed.')
     args = parser.parse_args()
 
+    # gym.register_envs(ale_py)
+
+    print("env_id: ", args.env_id)
+
     env = gym.make(args.env_id)
 
     # Set random seeds
@@ -85,12 +89,16 @@ if __name__ == '__main__':
     replay_buffer = []
 
     for i in range(episode_count):
+
+        if i % 50 == 0 and i > 0:
+            utils.save_list_dict_h5py(replay_buffer, args.fname)
+            replay_buffer = []  # Clear buffer to save memory
+
         replay_buffer.append({
             'obs': [],
             'action': [],
             'next_obs': [],
         })
-
         ob, _ = env.reset()
 
         if args.atari:
@@ -105,7 +113,8 @@ if __name__ == '__main__':
             ob = crop_normalize(ob, crop)
 
             while True:
-                replay_buffer[i]['obs'].append(
+                new_i = i % 50
+                replay_buffer[-1]['obs'].append(
                     np.concatenate((ob, prev_ob), axis=0))
                 prev_ob = ob
 
@@ -114,22 +123,23 @@ if __name__ == '__main__':
                 done = terminated or truncated
                 ob = crop_normalize(ob, crop)
 
-                replay_buffer[i]['action'].append(action)
-                replay_buffer[i]['next_obs'].append(
+                replay_buffer[-1]['action'].append(action)
+                replay_buffer[-1]['next_obs'].append(
                     np.concatenate((ob, prev_ob), axis=0))
 
                 if done:
                     break
         else:
             while True:
-                replay_buffer[i]['obs'].append(ob[1])
+                new_i = i % 50
+                replay_buffer[-1]['obs'].append(ob[1])
 
                 action = agent.act(ob, reward, done)
                 ob, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
 
-                replay_buffer[i]['action'].append(action)
-                replay_buffer[i]['next_obs'].append(ob[1])
+                replay_buffer[-1]['action'].append(action)
+                replay_buffer[-1]['next_obs'].append(ob[1])
 
                 if done:
                     break
