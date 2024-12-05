@@ -27,6 +27,7 @@ share/python-wheels/
 *.egg
 *.h5
 *.h5.npz
+*.npz
 MANIFEST
 
 # PyInstaller
