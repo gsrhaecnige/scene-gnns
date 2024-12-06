@@ -43,7 +43,7 @@ def load_dict_h5py(fname: str) -> Dict[str, np.ndarray]:
     return array_dict
 
 
-def save_list_dict_h5py(array_dict: List[Dict[str, np.ndarray]], fname: str) -> None:
+def save_list_dict_h5py(array_dict: List[Dict[str, np.ndarray]], fname: str, offset: int = 0) -> None:
     """Save list of dictionaries containing numpy arrays to h5py file."""
 
     # Ensure directory exists
@@ -51,9 +51,16 @@ def save_list_dict_h5py(array_dict: List[Dict[str, np.ndarray]], fname: str) -> 
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    with h5py.File(fname, 'w') as hf:
+    # Use 'a' (append) mode if file exists, 'w' (write) mode if it doesn't
+    mode = 'a' if os.path.exists(fname) else 'w'
+    
+    with h5py.File(fname, mode) as hf:
         for i in range(len(array_dict)):
-            grp = hf.create_group(str(i))
+            grp_name = str(i + offset)
+            # Delete group if it already exists (in append mode)
+            if grp_name in hf:
+                del hf[grp_name]
+            grp = hf.create_group(grp_name)
             for key in array_dict[i].keys():
                 grp.create_dataset(key, data=array_dict[i][key])
 
