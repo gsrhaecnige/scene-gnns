@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def visualize_pong_images(n_images=10, data_path='data/pong_train.h5', frame_stack_idx=0, consecutive=False, start_idx=0):
+def visualize_pong_images(n_images=10, data_path='data/pong_train.h5', frame_stack_idx=0, consecutive=False, start_idx=0, step=5):
     """
     Visualize a sample of images from the Pong dataset.
     
@@ -39,7 +39,7 @@ def visualize_pong_images(n_images=10, data_path='data/pong_train.h5', frame_sta
             if len(obs) >= n_images:
                 # Random starting point that ensures we have enough consecutive frames
                 # start_idx = np.random.randint(0, len(obs) - n_images + 1)
-                indices = range(start_idx, start_idx + n_images)
+                indices = range(start_idx, start_idx + n_images * step, step)
             else:
                 indices = range(len(obs))
         else:
@@ -77,4 +77,4 @@ def visualize_pong_images(n_images=10, data_path='data/pong_train.h5', frame_sta
 
 if __name__ == '__main__':
     # Example: Show 12 consecutive frames in a 3x4 grid
-    visualize_pong_images(n_images=10, consecutive=True, start_idx=95)
+    visualize_pong_images(n_images=10, data_path='data/spaceinvaders_train.h5', consecutive=True, start_idx=100)
