@@ -9,18 +9,20 @@ import torch.nn.functional as F
 import modules
 import utils
 import argparse
+import wandb
 
-app = modal.App("training-modal")
+
+# app = modal.App("training-modal")
 # @app.mount(path="/data", local_path="/Users/clairebookworm/Documents/github/scene-gnns/c-swm/modal_train/data")
-image = modal.Image.debian_slim().pip_install(["torch", "numpy", "h5py", "matplotlib", "argparse", "numpy", "utils","modules", "datetime"])
+# image = modal.Image.debian_slim().pip_install(["torch", "numpy", "h5py", "matplotlib", "argparse", "numpy", "utils","modules", "wandb",  "datetime"])
 
-with image.imports():
-	import numpy as np
-	from torch.utils import data
-	import torch.nn.functional as F
+# with image.imports():
+# 	import numpy as np
+# 	from torch.utils import data
+# 	import torch.nn.functional as F
 
 
-@app.function(image=image, gpu="A10G")
+# @app.function(image=image, gpu="A10G")
 def train_model(args):
 	import torch
 	import os
@@ -34,6 +36,15 @@ def train_model(args):
 	import argparse
 
 	print(f"Received args: {args}")
+
+	# os.environ['WANDB_API_KEY'] = 'your_api_key_here'
+	# # Initialize W&B
+	wandb.init(
+		project="contrastive-swm",  # Replace with your project name
+		config=vars(args),  # Log all hyperparameters
+		name=args.name,  # Experiment name
+	)
+	config = wandb.config
 	# Set up environment
 	np.random.seed(args.seed)
 	torch.manual_seed(args.seed)
@@ -110,13 +121,20 @@ def train_model(args):
 			if args.decoder:
 				optimizer_dec.step()
 
+		os.makedirs(os.path.dirname(args.model_file), exist_ok=True)
 		avg_loss = train_loss / len(train_loader.dataset)
+		
+		# Log metrics to W&B
+		wandb.log({"epoch": epoch, "loss": avg_loss})
+
 		if avg_loss < best_loss:
 			best_loss = avg_loss
 			with open(args.model_file, "wb") as f:
 				torch.save(model.state_dict(), f)
+			wandb.save(args.model_file)
+	wandb.finish()
 
-@app.local_entrypoint()
+# @app.local_entrypoint()
 # def main(dataset: str, encoder: str, embedding_dim: int, num_objects: int, ignore_action: bool, name: str):
 def main():
 	import argparse 
@@ -189,7 +207,7 @@ def main():
 		"seed": 42,  # Random seed
 		"log_interval": 20,  # How many batches to wait before logging training status
 
-		"dataset": "data/balls_train.h5",
+		"dataset": "modal_train/data/balls_train_500.h5",
 		"encoder": "medium",
 		"name": "balls",
 		"ignore_action": False,
@@ -212,4 +230,12 @@ def main():
 	args.model_file = os.path.join(args.save_folder, f"{args.name}_model.pt")
 	os.makedirs(args.save_folder, exist_ok=True)
 
-	train_model.remote(args)
+	try:
+		# train_model.remote(args)
+		train_model(args)
+	except Exception as e:
+		print(f"Error during training: {e}")
+
+
+if __name__ == "__main__":
+    main()
