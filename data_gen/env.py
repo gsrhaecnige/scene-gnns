@@ -91,7 +91,7 @@ if __name__ == '__main__':
     for i in range(episode_count):
 
         if i % 50 == 0 and i > 0:
-            utils.save_list_dict_h5py(replay_buffer, args.fname)
+            utils.save_list_dict_h5py(replay_buffer, args.fname, offset=i-50)
             replay_buffer = []  # Clear buffer to save memory
 
         replay_buffer.append({
@@ -150,4 +150,4 @@ if __name__ == '__main__':
     env.close()
 
     # Save replay buffer to disk.
-    utils.save_list_dict_h5py(replay_buffer, args.fname)
+    utils.save_list_dict_h5py(replay_buffer, args.fname, offset=episode_count-len(replay_buffer))
