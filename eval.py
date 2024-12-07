@@ -50,6 +50,8 @@ dataset = utils.PathDataset(
 eval_loader = data.DataLoader(
     dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
+for batch in eval_loader:
+    print(len(batch))
 # Get data sample
 obs = next(eval_loader.__iter__())[0]
 input_shape = obs[0][0].size()
