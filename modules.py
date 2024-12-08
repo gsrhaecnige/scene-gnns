@@ -120,15 +120,20 @@ class ContrastiveSWM(nn.Module):
         zeros: torch.Tensor = torch.zeros_like(self.pos_loss)
         
         pos_loss_per_example = self.pos_loss
+        print(f"pos_loss_per_example shape: {pos_loss_per_example.shape}")
 
         # negative loss using infoNCE
         expanded_state = state.unsqueeze(1).expand(-1, num_negatives, *state.shape[1:])  # Expand while preserving other dimensions
         expanded_action = action.unsqueeze(1).expand(-1, num_negatives, *action.shape[1:])  # Expand while preserving other dimensions
         neg_energy: torch.Tensor = self.energy(expanded_state, expanded_action, neg_states, no_trans=True)
         neg_energy: torch.Tensor = neg_energy.mean(dim=1)  # Average over negative samples
+        print(f"neg_energy shape after mean: {neg_energy.shape}")
 
-        # InfoNCE loss
-        logits: torch.Tensor = torch.cat([pos_loss_per_example.unsqueeze(1), neg_energy], dim=1)
+        # InfoNCE loss - ensure both tensors are 2D before concatenating
+        pos_loss_2d = pos_loss_per_example.view(-1, 1)  # Make it [batch_size, 1]
+        neg_energy_2d = neg_energy.view(-1, 1)  # Make it [batch_size, 1]
+        logits: torch.Tensor = torch.cat([pos_loss_2d, neg_energy_2d], dim=1)
+        print(f"logits shape: {logits.shape}")
         labels: torch.Tensor = torch.zeros(batch_size, dtype=torch.long, device=logits.device)
         self.neg_loss: float = F.cross_entropy(logits, labels)
 
