@@ -13,7 +13,7 @@ import wandb
 
 
 # app = modal.App("training-modal")
-# @app.mount(path="/data", local_path="/Users/clairebookworm/Documents/github/scene-gnns/c-swm/modal_train/data")
+# # @app.mount(path="/data", local_path="/Users/clairebookworm/Documents/github/scene-gnns/c-swm/modal_train/data")
 # image = modal.Image.debian_slim().pip_install(["torch", "numpy", "h5py", "matplotlib", "argparse", "numpy", "utils","modules", "wandb",  "datetime"])
 
 # with image.imports():
@@ -22,7 +22,7 @@ import wandb
 # 	import torch.nn.functional as F
 
 
-# @app.function(image=image, gpu="A10G")
+# @app.function(image=image, gpu="A10G", memory="500Gi")
 def train_model(args):
 	import torch
 	import os
@@ -36,6 +36,7 @@ def train_model(args):
 	import argparse
 
 	print(f"Received args: {args}")
+	
 
 	# os.environ['WANDB_API_KEY'] = 'your_api_key_here'
 	# # Initialize W&B
@@ -207,9 +208,9 @@ def main():
 		"seed": 42,  # Random seed
 		"log_interval": 20,  # How many batches to wait before logging training status
 
-		"dataset": "modal_train/data/balls_train_500.h5",
+		"dataset": "modal_train/data/spaceinvaders_train.h5",
 		"encoder": "medium",
-		"name": "balls",
+		"name": "spaceinvaders",
 		"ignore_action": False,
 		"num_objects": 3,
 		"embedding_dim": 4,
