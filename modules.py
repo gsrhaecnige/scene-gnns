@@ -78,6 +78,7 @@ class ContrastiveSWM(nn.Module):
 
     def energy(self, state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, no_trans: bool = False) -> torch.Tensor:
         """Energy function based on normalized squared L2 norm."""
+        print(f"Energy inputs - state: {state.shape}, action: {action.shape}, next_state: {next_state.shape}")
 
         norm: float = 0.5 / (self.sigma**2)
 
@@ -110,13 +111,20 @@ class ContrastiveSWM(nn.Module):
         num_negatives: int = 10  # Number of negative samples
         neg_states: torch.Tensor = torch.stack([state[np.random.permutation(batch_size)] for _ in range(num_negatives)], dim=1)
 
+        print(f"state shape: {state.shape}")
+        print(f"action shape: {action.shape}")
+        print(f"next_state shape: {next_state.shape}")
+        print(f"neg_states shape: {neg_states.shape}")
+
         self.pos_loss: float = self.energy(state, action, next_state)
         zeros: torch.Tensor = torch.zeros_like(self.pos_loss)
         
         self.pos_loss: float = self.pos_loss.mean()
 
         # negative loss using infoNCE
-        neg_energy: torch.Tensor = self.energy(state.unsqueeze(1).expand(-1, num_negatives, -1, -1), action.unsqueeze(1).expand(-1, num_negatives, -1), neg_states, no_trans=True)
+        expanded_state = state.unsqueeze(1).expand(-1, num_negatives, *state.shape[1:])  # Expand while preserving other dimensions
+        expanded_action = action.unsqueeze(1).expand(-1, num_negatives, *action.shape[1:])  # Expand while preserving other dimensions
+        neg_energy: torch.Tensor = self.energy(expanded_state, expanded_action, neg_states, no_trans=True)
         neg_energy: torch.Tensor = neg_energy.mean(dim=1)  # Average over negative samples
 
         # InfoNCE loss
