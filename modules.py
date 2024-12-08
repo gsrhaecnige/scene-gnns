@@ -119,7 +119,7 @@ class ContrastiveSWM(nn.Module):
         self.pos_loss: float = self.energy(state, action, next_state)
         zeros: torch.Tensor = torch.zeros_like(self.pos_loss)
         
-        self.pos_loss: float = self.pos_loss.mean()
+        pos_loss_per_example = self.pos_loss
 
         # negative loss using infoNCE
         expanded_state = state.unsqueeze(1).expand(-1, num_negatives, *state.shape[1:])  # Expand while preserving other dimensions
@@ -128,7 +128,7 @@ class ContrastiveSWM(nn.Module):
         neg_energy: torch.Tensor = neg_energy.mean(dim=1)  # Average over negative samples
 
         # InfoNCE loss
-        logits: torch.Tensor = torch.cat([self.pos_loss.unsqueeze(1), neg_energy], dim=1)
+        logits: torch.Tensor = torch.cat([pos_loss_per_example.unsqueeze(1), neg_energy], dim=1)
         labels: torch.Tensor = torch.zeros(batch_size, dtype=torch.long, device=logits.device)
         self.neg_loss: float = F.cross_entropy(logits, labels)
 
@@ -136,6 +136,7 @@ class ContrastiveSWM(nn.Module):
         #     zeros, self.hinge - self.energy(
         #         state, action, neg_state, no_trans=True)).mean()
 
+        self.pos_loss = pos_loss_per_example.mean()
         loss: torch.Tensor = self.pos_loss + self.neg_loss
 
         return loss
