@@ -171,13 +171,13 @@ def visualize_transitions(model: torch.nn.Module,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model-path', type=str, default='checkpoints/pong/model.pt',
+    parser.add_argument('--model-path', type=str, default='checkpoints/pong_k5/model.pt',
                        help='Path to model checkpoint')
-    parser.add_argument('--meta-path', type=str, default='checkpoints/pong/metadata.pkl',
+    parser.add_argument('--meta-path', type=str, default='checkpoints/pong_k5/metadata.pkl',
                        help='Path to metadata file')
     parser.add_argument('--dataset', type=str, default='data/pong_eval.h5',
                        help='Path to dataset')
-    parser.add_argument('--save-dir', type=str, default='pong_visualizations',
+    parser.add_argument('--save-dir', type=str, default='pong_k5_visualizations',
                        help='Directory to save visualizations')
     parser.add_argument('--batch-size', type=int, default=4,
                        help='Number of examples to visualize')
