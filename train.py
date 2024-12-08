@@ -47,6 +47,8 @@ parser.add_argument('--decoder', action='store_true', default=False,
 
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disable CUDA training.')
+parser.add_argument('--device-id', type=int, default=0,
+                    help='Device ID.')
 parser.add_argument('--seed', type=int, default=42,
                     help='Random seed (default: 42).')
 parser.add_argument('--log-interval', type=int, default=20,
@@ -93,7 +95,7 @@ print = logger.info
 
 pickle.dump({'args': args}, open(meta_file, "wb"))
 
-device = torch.device('cuda:1' if args.cuda else 'cpu')
+device = torch.device(f'cuda:{args.device_id}' if args.cuda else 'cpu')
 
 dataset = utils.StateTransitionsDataset(
     hdf5_file=args.dataset)
