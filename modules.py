@@ -116,7 +116,7 @@ class ContrastiveSWM(nn.Module):
         self.pos_loss: float = self.pos_loss.mean()
 
         # negative loss using infoNCE
-        neg_energy: torch.Tensor = self.energy(state.unsqueeze(1).expand(-1, num_negatives, -1), action.unsqueeze(1).expand(-1, num_negatives, -1), neg_states, no_trans=True)
+        neg_energy: torch.Tensor = self.energy(state.unsqueeze(1).expand(-1, num_negatives, -1, -1), action.unsqueeze(1).expand(-1, num_negatives, -1), neg_states, no_trans=True)
         neg_energy: torch.Tensor = neg_energy.mean(dim=1)  # Average over negative samples
 
         # InfoNCE loss
