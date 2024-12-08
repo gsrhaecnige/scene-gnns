@@ -100,18 +100,33 @@ class ContrastiveSWM(nn.Module):
         state: torch.Tensor = self.obj_encoder(objs)
         next_state: torch.Tensor = self.obj_encoder(next_objs)
 
-        # Sample negative state across episodes at random
-        batch_size: int = state.size(0)
-        perm: np.ndarray = np.random.permutation(batch_size)
-        neg_state: torch.Tensor = state[perm]
+        # # Sample negative state across episodes at random
+        # batch_size: int = state.size(0)
+        # perm: np.ndarray = np.random.permutation(batch_size)
+        # neg_state: torch.Tensor = state[perm]
+
+		# Sample multiple negative states across episodes at random
+		batch_size: int = state.size(0)
+		num_negatives: int = 10  # Number of negative samples
+		neg_states: torch.Tensor = torch.stack([state[np.random.permutation(batch_size)] for _ in range(num_negatives)], dim=1)
 
         self.pos_loss: float = self.energy(state, action, next_state)
         zeros: torch.Tensor = torch.zeros_like(self.pos_loss)
         
         self.pos_loss: float = self.pos_loss.mean()
-        self.neg_loss: float = torch.max(
-            zeros, self.hinge - self.energy(
-                state, action, neg_state, no_trans=True)).mean()
+
+		# negative loss using infoNCE
+		neg_energy: torch.Tensor = self.energy(state.unsqueeze(1).expand(-1, num_negatives, -1), action.unsqueeze(1).expand(-1, num_negatives, -1), neg_states, no_trans=True)
+		neg_energy: torch.Tensor = neg_energy.mean(dim=1)  # Average over negative samples
+
+		# InfoNCE loss
+		logits: torch.Tensor = torch.cat([self.pos_loss.unsqueeze(1), neg_energy], dim=1)
+		labels: torch.Tensor = torch.zeros(batch_size, dtype=torch.long, device=logits.device)
+		self.neg_loss: float = F.cross_entropy(logits, labels)
+
+        # self.neg_loss: float = torch.max(
+        #     zeros, self.hinge - self.energy(
+        #         state, action, neg_state, no_trans=True)).mean()
 
         loss: torch.Tensor = self.pos_loss + self.neg_loss
 
