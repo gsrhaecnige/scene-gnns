@@ -1,0 +1,45 @@
+{
+  "os": "macOS-14.4-arm64-arm-64bit",
+  "python": "CPython 3.9.18",
+  "startedAt": "2024-12-08T21:18:06.055110Z",
+  "program": "/Users/clairebookworm/Documents/github/scene-gnns/modal_train/entrypoint.py",
+  "codePath": "modal_train/entrypoint.py",
+  "git": {
+    "remote": "https://github.com/ClaireBookworm/scene-gnns.git",
+    "commit": "66f04368e76348881c39c052100bbafdfeab5d77"
+  },
+  "email": "clara32356@gmail.com",
+  "root": "/Users/clairebookworm/Documents/github/scene-gnns",
+  "host": "Claires-MacBook-Pro.local",
+  "username": "clairebookworm",
+  "executable": "/opt/homebrew/anaconda3/envs/gnns/bin/python",
+  "codePathLocal": "modal_train/entrypoint.py",
+  "cpu_count": 12,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "994662584320",
+      "used": "474516029440"
+    },
+    "/System/Volumes/Data": {
+      "total": "994662584320",
+      "used": "474516029440"
+    }
+  },
+  "memory": {
+    "total": "19327352832"
+  },
+  "cpu": {
+    "count": 12,
+    "countLogical": 12
+  },
+  "apple": {
+    "name": "Apple M3 Pro",
+    "ecpuCores": 6,
+    "pcpuCores": 6,
+    "gpuCores": 18,
+    "memoryGb": 18,
+    "swapTotalBytes": "10737418240",
+    "ramTotalBytes": "19327352832"
+  }
+}
