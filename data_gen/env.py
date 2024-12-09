@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     crop = None
     warmstart = None
-    if args.env_id == 'PongDeterministic-v4':
+    if args.env_id == 'Pong-ramDeterministic-v4':
         crop = (35, 190)
         warmstart = 58
     elif args.env_id == 'SpaceInvadersDeterministic-v4':
