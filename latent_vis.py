@@ -72,7 +72,7 @@ def visualize_embeddings(model: torch.nn.Module, obs: torch.Tensor, save_path: O
         for i in range(num_objects):
             ax.scatter(batch_embeddings[i, 0],
                       batch_embeddings[i, 1],
-                      c=[colors[i]], label=f'Object {i+1}')
+                      c=[colors[i]], label=f'Object {i+1}', s=175)
         
         ax.set_xlabel('Dim 1')
         ax.set_ylabel('Dim 2')
@@ -141,17 +141,17 @@ def visualize_transitions(model: torch.nn.Module,
             # Plot current state
             ax.scatter(batch_state[i, 0],
                       batch_state[i, 1],
-                      c=[colors[i]], label=f'Object {i+1} (Current)')
+                      c=[colors[i]], label=f'Object {i+1} (Current)', s=175)
             
             # Plot predicted next state
             ax.scatter(batch_pred_next_state[i, 0],
                       batch_pred_next_state[i, 1],
-                      c=[colors[i]], marker='x', label=f'Object {i+1} (Predicted)')
+                      c=[colors[i]], marker='x', label=f'Object {i+1} (Predicted)', s=175)
             
             # Plot actual next state
             ax.scatter(batch_next_state[i, 0],
                       batch_next_state[i, 1],
-                      c=[colors[i]], marker='+', label=f'Object {i+1} (Actual)')
+                      c=[colors[i]], marker='+', label=f'Object {i+1} (Actual)', s=175)
             
             # Draw arrows for transitions
             ax.quiver(batch_state[i, 0],
