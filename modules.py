@@ -3,8 +3,7 @@ import utils
 import numpy as np
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
 from typing import Tuple, Optional, Dict, Any, Union
 
 
@@ -79,6 +78,7 @@ class ContrastiveSWM(nn.Module):
 
     def energy(self, state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, no_trans: bool = False) -> torch.Tensor:
         """Energy function based on normalized squared L2 norm."""
+
         norm: float = 0.5 / (self.sigma**2)
 
         if no_trans:
@@ -100,35 +100,19 @@ class ContrastiveSWM(nn.Module):
         state: torch.Tensor = self.obj_encoder(objs)
         next_state: torch.Tensor = self.obj_encoder(next_objs)
 
-        # Sample multiple negative states across episodes at random
+        # Sample negative state across episodes at random
         batch_size: int = state.size(0)
-        num_negatives: int = 10  # Number of negative samples
-        neg_states: torch.Tensor = torch.stack([state[np.random.permutation(batch_size)] for _ in range(num_negatives)], dim=1)
+        perm: np.ndarray = np.random.permutation(batch_size)
+        neg_state: torch.Tensor = state[perm]
 
-        # Compute positive energy
         self.pos_loss: float = self.energy(state, action, next_state)
-        pos_loss_per_example = self.pos_loss
-
-        # Compute negative energies using infoNCE
-        expanded_state = state.unsqueeze(1).expand(-1, num_negatives, *state.shape[1:])
-        expanded_action = action.unsqueeze(1).expand(-1, num_negatives, *action.shape[1:])
-        neg_energy: torch.Tensor = self.energy(expanded_state, expanded_action, neg_states, no_trans=True)
-
-        # InfoNCE loss computation
-        pos_loss_2d = pos_loss_per_example.view(-1, 1)  # Shape: [batch_size, 1]
-        neg_energy_2d = neg_energy  # Shape: [batch_size, num_negatives]
+        zeros: torch.Tensor = torch.zeros_like(self.pos_loss)
         
-        # Concatenate positive and negative energies
-        # Note: We negate the energies since we want positive pairs to have higher similarity (lower energy)
-        logits = torch.cat([-pos_loss_2d, -neg_energy_2d], dim=1)  # Shape: [batch_size, 1 + num_negatives]
-        labels = torch.zeros(batch_size, dtype=torch.long, device=logits.device)
-        
-        # Cross entropy loss will try to maximize the similarity for positive pairs (index 0)
-        # and minimize similarity for negative pairs
-        self.neg_loss: float = F.cross_entropy(logits, labels)
+        self.pos_loss: float = self.pos_loss.mean()
+        self.neg_loss: float = torch.max(
+            zeros, self.hinge - self.energy(
+                state, action, neg_state, no_trans=True)).mean()
 
-        # Take mean of pos_loss for final loss
-        self.pos_loss = pos_loss_per_example.mean()
         loss: torch.Tensor = self.pos_loss + self.neg_loss
 
         return loss
