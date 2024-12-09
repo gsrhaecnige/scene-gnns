@@ -3,7 +3,8 @@ import utils
 import numpy as np
 
 import torch
-from torch import nn
+import torch.nn as nn
+import torch.nn.functional as F
 from typing import Tuple, Optional, Dict, Any, Union
 
 
@@ -78,8 +79,6 @@ class ContrastiveSWM(nn.Module):
 
     def energy(self, state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, no_trans: bool = False) -> torch.Tensor:
         """Energy function based on normalized squared L2 norm."""
-        print(f"Energy inputs - state: {state.shape}, action: {action.shape}, next_state: {next_state.shape}")
-
         norm: float = 0.5 / (self.sigma**2)
 
         if no_trans:
@@ -101,46 +100,30 @@ class ContrastiveSWM(nn.Module):
         state: torch.Tensor = self.obj_encoder(objs)
         next_state: torch.Tensor = self.obj_encoder(next_objs)
 
-        # # Sample negative state across episodes at random
-        # batch_size: int = state.size(0)
-        # perm: np.ndarray = np.random.permutation(batch_size)
-        # neg_state: torch.Tensor = state[perm]
-
         # Sample multiple negative states across episodes at random
         batch_size: int = state.size(0)
         num_negatives: int = 10  # Number of negative samples
         neg_states: torch.Tensor = torch.stack([state[np.random.permutation(batch_size)] for _ in range(num_negatives)], dim=1)
 
-        print(f"state shape: {state.shape}")
-        print(f"action shape: {action.shape}")
-        print(f"next_state shape: {next_state.shape}")
-        print(f"neg_states shape: {neg_states.shape}")
-
+        # Compute positive energy
         self.pos_loss: float = self.energy(state, action, next_state)
         zeros: torch.Tensor = torch.zeros_like(self.pos_loss)
-        
         pos_loss_per_example = self.pos_loss
-        print(f"pos_loss_per_example shape: {pos_loss_per_example.shape}")
 
-        # negative loss using infoNCE
-        expanded_state = state.unsqueeze(1).expand(-1, num_negatives, *state.shape[1:])  # Expand while preserving other dimensions
-        expanded_action = action.unsqueeze(1).expand(-1, num_negatives, *action.shape[1:])  # Expand while preserving other dimensions
+        # Compute negative energies using infoNCE
+        expanded_state = state.unsqueeze(1).expand(-1, num_negatives, *state.shape[1:])
+        expanded_action = action.unsqueeze(1).expand(-1, num_negatives, *action.shape[1:])
         neg_energy: torch.Tensor = self.energy(expanded_state, expanded_action, neg_states, no_trans=True)
-        neg_energy: torch.Tensor = neg_energy.mean(dim=1)  # Average over negative samples
-        print(f"neg_energy shape after mean: {neg_energy.shape}")
+        neg_energy: torch.Tensor = neg_energy.mean(dim=1)
 
-        # InfoNCE loss - ensure both tensors are 2D before concatenating
-        pos_loss_2d = pos_loss_per_example.view(-1, 1)  # Make it [batch_size, 1]
-        neg_energy_2d = neg_energy.view(-1, 1)  # Make it [batch_size, 1]
+        # InfoNCE loss computation
+        pos_loss_2d = pos_loss_per_example.view(-1, 1)
+        neg_energy_2d = neg_energy.view(-1, 1)
         logits: torch.Tensor = torch.cat([pos_loss_2d, neg_energy_2d], dim=1)
-        print(f"logits shape: {logits.shape}")
         labels: torch.Tensor = torch.zeros(batch_size, dtype=torch.long, device=logits.device)
         self.neg_loss: float = F.cross_entropy(logits, labels)
 
-        # self.neg_loss: float = torch.max(
-        #     zeros, self.hinge - self.energy(
-        #         state, action, neg_state, no_trans=True)).mean()
-
+        # Take mean of pos_loss for final loss
         self.pos_loss = pos_loss_per_example.mean()
         loss: torch.Tensor = self.pos_loss + self.neg_loss
 
