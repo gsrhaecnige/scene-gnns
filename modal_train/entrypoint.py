@@ -12,17 +12,17 @@ import argparse
 import wandb
 
 
-# app = modal.App("training-modal")
+app = modal.App("training-modal")
 # # @app.mount(path="/data", local_path="/Users/clairebookworm/Documents/github/scene-gnns/c-swm/modal_train/data")
-# image = modal.Image.debian_slim().pip_install(["torch", "numpy", "h5py", "matplotlib", "argparse", "numpy", "utils","modules", "wandb",  "datetime"])
+image = modal.Image.debian_slim().pip_install(["torch", "numpy", "h5py", "matplotlib", "argparse", "numpy", "utils","modules", "wandb",  "datetime"])
 
-# with image.imports():
-# 	import numpy as np
-# 	from torch.utils import data
-# 	import torch.nn.functional as F
+with image.imports():
+	import numpy as np
+	from torch.utils import data
+	import torch.nn.functional as F
 
 
-# @app.function(image=image, gpu="A10G", memory="500Gi")
+@app.function(image=image, gpu="A10G", memory="500Gi")
 def train_model(args):
 	import torch
 	import os
@@ -36,6 +36,7 @@ def train_model(args):
 	import argparse
 
 	print(f"Received args: {args}")
+	os.environ['WANDB_API_KEY'] = '85df37d5cf5cb27db5e0b1b7f55d5faf378e3704'
 	
 
 	# os.environ['WANDB_API_KEY'] = 'your_api_key_here'
@@ -97,6 +98,7 @@ def train_model(args):
 		train_loss = 0
 
 		for batch_idx, data_batch in enumerate(train_loader):
+
 			data_batch = [tensor.to(device) for tensor in data_batch]
 			optimizer.zero_grad()
 
@@ -124,6 +126,14 @@ def train_model(args):
 
 		os.makedirs(os.path.dirname(args.model_file), exist_ok=True)
 		avg_loss = train_loss / len(train_loader.dataset)
+
+		if batch_idx % args.log_interval == 0:
+            print(
+                'Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data_batch[0]),
+                    len(train_loader.dataset),
+                    100. * batch_idx / len(train_loader),
+                    loss.item() / len(data_batch[0])))
 		
 		# Log metrics to W&B
 		wandb.log({"epoch": epoch, "loss": avg_loss})
@@ -135,7 +145,7 @@ def train_model(args):
 			wandb.save(args.model_file)
 	wandb.finish()
 
-# @app.local_entrypoint()
+@app.local_entrypoint()
 # def main(dataset: str, encoder: str, embedding_dim: int, num_objects: int, ignore_action: bool, name: str):
 def main():
 	import argparse 

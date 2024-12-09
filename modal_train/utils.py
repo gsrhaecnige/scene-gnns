@@ -70,8 +70,10 @@ def load_list_dict_h5py(fname: str) -> List[Dict[str, np.ndarray]]:
     array_dict = list()
     with h5py.File(fname, 'r') as hf:
         for i, grp in enumerate(hf.keys()):
+            # print("group: " + str(i))
             array_dict.append(dict())
             for key in hf[grp].keys():
+                print(f"Dataset {key}: shape={hf[grp][key].shape}, size={hf[grp][key].size}")
                 array_dict[i][key] = hf[grp][key][:]
     return array_dict
 
