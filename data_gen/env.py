@@ -43,7 +43,7 @@ def crop_normalize(img: np.ndarray, crop_ratio: Tuple[int, int]) -> np.ndarray:
     return np.transpose(np.array(img), (2, 0, 1)) / 255
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--env_id', type=str, default='ShapesTrain-v0',
                         help='Select the environment to run.')
@@ -151,3 +151,6 @@ if __name__ == '__main__':
 
     # Save replay buffer to disk.
     utils.save_list_dict_h5py(replay_buffer, args.fname, offset=episode_count-len(replay_buffer))
+
+if __name__ == '__main__':
+    main()
