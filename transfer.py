@@ -214,7 +214,7 @@ def main():
                 # objs = objs[:, indices]  # Select the random 100 features
                 state = model.obj_encoder(objs)
 
-                print(f"Shape of state: {state.shape}")
+                # print(f"Shape of state: {state.shape}")
                 
                 rec = torch.sigmoid(decoder(state))
                 loss = F.binary_cross_entropy(rec, obs, reduction='sum') / obs.size(0)
