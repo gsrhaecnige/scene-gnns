@@ -1,7 +1,13 @@
 import re
+import argparse
 import matplotlib.pyplot as plt
 
-filepath = "checkpoints_transfer/pong_transfer/log.txt"
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Plot training loss over epochs.')
+parser.add_argument('--filepath', type=str, required=True, help='Path to the log file')
+args = parser.parse_args()
+
+filepath = args.filepath
 
 # Load the log text from a file
 with open(filepath, 'r') as file:
