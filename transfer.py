@@ -1,14 +1,14 @@
 # command
-# python transfer.py \
-#     --pretrained-model checkpoints/spaceinvaders/model.pt \
-#     --new-dataset data/balls_train_50.h5 \
-#     --batch-size 512 \
-#     --epochs 50 \
-#     --learning-rate 1e-4 \
-#     --encoder medium \
-#     --action-dim 6 --name pong_transfer \
-#     --decoder \
-#     --device-id 0
+python transfer.py \
+    --pretrained-model checkpoints/pong_k3/model.pt \
+    --new-dataset data/spaceinvaders_train.h5 \
+    --batch-size 512 \
+    --epochs 50 \
+    --learning-rate 1e-4 \
+    --encoder medium \
+    --action-dim 6 --name space_transfer \
+    --decoder \
+    --device-id 0
 
 
 import argparse
@@ -213,8 +213,6 @@ def main():
                 # indices = torch.randperm(objs.size(1))[:100]  # Get random 100 indices
                 # objs = objs[:, indices]  # Select the random 100 features
                 state = model.obj_encoder(objs)
-
-                print(f"Shape of state: {state.shape}")
                 
                 rec = torch.sigmoid(decoder(state))
                 loss = F.binary_cross_entropy(rec, obs, reduction='sum') / obs.size(0)
