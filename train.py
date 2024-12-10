@@ -205,9 +205,3 @@ for epoch in range(1, args.epochs + 1):
     if avg_loss < best_loss:
         best_loss = avg_loss
         torch.save(model.state_dict(), model_file)
-    
-    # Save model checkpoint every 10 epochs
-    if (epoch + 1) % 10 == 0:
-        checkpoint_file = os.path.join(save_folder, f'model_epoch_{epoch+1}.pt')
-        torch.save(model.state_dict(), checkpoint_file)
-        print(f'Saved model checkpoint at epoch {epoch+1}')
