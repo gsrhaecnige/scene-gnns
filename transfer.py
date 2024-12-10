@@ -1,14 +1,14 @@
 # command
-python transfer.py \
-    --pretrained-model checkpoints/pong_k3/model.pt \
-    --new-dataset data/spaceinvaders_train.h5 \
-    --batch-size 512 \
-    --epochs 50 \
-    --learning-rate 1e-4 \
-    --encoder medium \
-    --action-dim 6 --name space_transfer \
-    --decoder \
-    --device-id 0
+# python transfer.py \
+#     --pretrained-model checkpoints/pong_k3/model.pt \
+#     --new-dataset data/spaceinvaders_train.h5 \
+#     --batch-size 512 \
+#     --epochs 100 \
+#     --learning-rate 1e-4 \
+#     --encoder medium \
+#     --action-dim 6 --name space_transfer_100 \
+#     --decoder \
+#     --device-id 0
 
 
 import argparse
@@ -205,13 +205,6 @@ def main():
                 optimizer_dec.zero_grad()
                 obs, action, next_obs = data_batch
                 objs = model.obj_extractor(obs)
-                # print(f"Shape of objs: {objs.shape}")
-                # print(f"Shape of obs: {obs.shape}")
-                # print(f"Shape of action: {action.shape}")
-                # Take a random 100 features of the objs vector
-                # objs = objs.view(objs.size(0), -1)  
-                # indices = torch.randperm(objs.size(1))[:100]  # Get random 100 indices
-                # objs = objs[:, indices]  # Select the random 100 features
                 state = model.obj_encoder(objs)
                 
                 rec = torch.sigmoid(decoder(state))
