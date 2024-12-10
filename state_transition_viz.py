@@ -8,6 +8,7 @@ import os
 import argparse
 from typing import List, Tuple, Optional
 from sklearn.decomposition import PCA
+import matplotlib.colors as mcolors
 
 def visualize_object_masks(model: torch.nn.Module, obs: torch.Tensor, save_path: Optional[str] = None) -> None:
     """Visualize object masks extracted by the CNN encoder."""
@@ -80,20 +81,34 @@ def visualize_transitions(model: torch.nn.Module,
                 batch_pred_trans = np.column_stack([batch_pred_trans, np.zeros_like(batch_pred_trans)])
             
         for object_idx in range(num_objects):
+            colors = np.linspace(0.4, 0, len(predicted_next_states)) 
             fig, ax = plt.subplots(figsize=(10, 10))
             x_coords = [all_points[step][object_idx][0] for step in range(50)]
             y_coords = [all_points[step][object_idx][1] for step in range(50)]
 
             for i in range(len(predicted_next_states)):
-                alpha = (i + 2 * len(predicted_next_states) / 3) / (2 * len(predicted_next_states))  # Alpha increases as i increases
-                ax.scatter(x_coords[i], y_coords[i], color="blue", alpha=alpha, s=100)
+                # alpha = (i + 2 * len(predicted_next_states) / 3) / (2 * len(predicted_next_states))  # Alpha increases as i increases
+                # ax.scatter(x_coords[i], y_coords[i], color="blue", alpha=alpha, s=100)
+                # alpha = (i + 2 * len(predicted_next_states) / 3) / (2 * len(predicted_next_states))  # Alpha increases as i increases
+                # Calculate the color for the current point based on its position
+                point_color = plt.cm.RdYlGn(colors[i])  # Use the RdYlGn colormap to get a color between green and red
+                # Plot the point with the calculated color and alpha
+                ax.scatter(x_coords[i], y_coords[i], color=point_color, alpha=1, s=100)
         
             ax.set_xlabel('Dim 1')
             ax.set_ylabel('Dim 2')
-            plt.title(f'State Transitions (Batch {b}, Object {object_idx+1})')
+            plt.title(f'State Transitions (Batch {2}, Object {object_idx+1})')
+
+            cmap = plt.cm.YlOrRd  # Yellow to Red colormap (you can use RdYlGn or other colormaps as well)
+            norm = mcolors.Normalize(vmin=0, vmax=len(x_coords) - 1)
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])  # Empty array for the color bar
+            cbar = plt.colorbar(sm, ax=ax)
+            cbar.set_ticks([])
+            cbar.set_label('Yellow = Old, Red = New')
             # plt.legend()
             if save_path:
-                plt.savefig(f'{save_path}/transitions_batch{b}_object{object_idx}.png')
+                plt.savefig(f'{save_path}/transitions_batch{2}_object{object_idx}.png')
             plt.show()
             plt.close()
 
