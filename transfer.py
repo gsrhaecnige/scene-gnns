@@ -1,3 +1,16 @@
+# command
+# python transfer.py \
+#     --pretrained-model checkpoints/spaceinvaders/model.pt \
+#     --new-dataset data/balls_train_50.h5 \
+#     --batch-size 512 \
+#     --epochs 50 \
+#     --learning-rate 1e-4 \
+#     --encoder medium \
+#     --action-dim 6 --name pong_transfer \
+#     --decoder \
+#     --device-id 0
+
+
 import argparse
 import torch
 import utils
@@ -10,8 +23,116 @@ import logging
 
 from torch.utils import data
 import torch.nn.functional as F
-
+import torch.nn as nn
+from collections import OrderedDict
 import modules
+
+# Define your model architecture (example: a custom model class)
+class PongToSpace(nn.Module):
+    def __init__(self, num_actions):
+        super(PongToSpace, self).__init__()
+        self.obj_extractor = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU()
+        )
+        self.obj_encoder = nn.Sequential(
+            nn.Linear(32 * 210 * 160, 128),  # Adjust the input size based on the output of obj_extractor
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_actions)
+        )
+        self.transition_model = nn.Sequential(
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32)
+        )
+
+    def forward(self, x):
+        x = self.obj_extractor(x)
+        x = x.view(x.size(0), -1)  # Flatten the tensor
+        # print(f"Shape after flattening: {x.shape}")  # Debugging information
+        x = self.obj_encoder(x)
+        return x
+
+
+class SpaceToPong(nn.Module):
+    def __init__(self, num_actions=4):
+        super(SpaceToPong, self).__init__()
+        
+        # According to your parameters:
+        # obj_extractor:
+        # - cnn1.weight: [32,6,9,9] suggests Conv2d(in_channels=6, out_channels=32, kernel_size=9)
+        # - ln1.* parameters suggest a batch/instance/layer norm with 32 channels
+        # - cnn2.weight: [3,32,5,5] suggests Conv2d(in_channels=32, out_channels=3, kernel_size=5)
+        self.obj_extractor = nn.Sequential(OrderedDict([
+            ('cnn1', nn.Conv2d(in_channels=6, out_channels=32, kernel_size=9)),
+            ('ln1', nn.BatchNorm2d(32)),   # chosen BatchNorm2d based on running_mean/var
+            ('cnn2', nn.Conv2d(in_channels=32, out_channels=3, kernel_size=5))
+        ]))
+
+        # obj_encoder:
+        # - fc1.weight: [512,100] means nn.Linear(100->512)
+        # - fc2.weight: [512,512] means nn.Linear(512->512)
+        # - fc3.weight: [4,512] means nn.Linear(512->4)
+        # - ln.*: [512] suggests a normalization layer with 512 features (likely LayerNorm or BatchNorm1d)
+        # We'll assume LayerNorm(512)
+        self.obj_encoder = nn.Sequential(OrderedDict([
+            ('fc1', nn.Linear(100, 512)),
+            ('fc2', nn.Linear(512, 512)),
+            ('ln', nn.LayerNorm(512)),
+            ('fc3', nn.Linear(512, 4))
+        ]))
+        
+        # transition_model:
+        # edge_mlp and node_mlp have several layers:
+        # edge_mlp:
+        # - Linear(8->512), Linear(512->512), another Linear(512->512)? The pattern suggests a 3-layer MLP
+        # node_mlp:
+        # - Linear(522->512), Linear(512->512), Linear(512->4)
+        # The presence of weights like edge_mlp.3.weight: [512] suggests additional normalization or bias terms.
+        # We'll guess a structure based on the indices:
+        # Typically, layers in .0, .2, .5 might be linear layers and .3 something else like a norm or activation.
+        # Without exact code, we can try:
+        
+        self.transition_model = nn.ModuleDict({
+            'edge_mlp': nn.Sequential(
+                nn.Linear(8, 512),
+                nn.ReLU(),
+                nn.Linear(512, 512),
+                nn.ReLU(),
+                nn.Linear(512, 512)
+            ),
+            'node_mlp': nn.Sequential(
+                nn.Linear(522, 512),
+                nn.ReLU(),
+                nn.Linear(512, 512),
+                nn.ReLU(),
+                nn.Linear(512, 4)
+            )
+        })
+
+    def forward(self, x):
+        # Forward logic depends on your data flow.
+        # For demonstration, we'll just show dimension transformations.
+        # After obj_extractor, you must ensure x matches the shape needed for fc1 (which expects 100 inputs).
+        # The actual input image shape and pre-processing are crucial here.
+
+        # Example forward (this may not run until you have correct input shapes):
+        x = self.obj_extractor(x)
+        # Flatten
+        x = x.view(x.size(0), -1)
+        # Suppose after flattening, we have exactly 100 features:
+        x = self.obj_encoder(x)  # produces a (batch_size,4) output
+        # Using transition_model would require separate inputs (like edges or node attributes)
+        # This code is a placeholder.
+
+        return x
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Transfer Learning for SWM Models')
@@ -21,15 +142,15 @@ def parse_args():
     parser.add_argument('--learning-rate', type=float, default=1e-4, help='Learning rate.')
     
     # Model parameters
-    parser.add_argument('--encoder', type=str, default='small', help='Object extractor CNN size (e.g., `small`).')
+    parser.add_argument('--encoder', type=str, default='medium', help='Object extractor CNN size (e.g., `small`).')
     parser.add_argument('--sigma', type=float, default=0.5, help='Energy scale.')
     parser.add_argument('--hinge', type=float, default=1., help='Hinge threshold parameter.')
     parser.add_argument('--hidden-dim', type=int, default=512, help='Number of hidden units in transition MLP.')
-    parser.add_argument('--embedding-dim', type=int, default=2, help='Dimensionality of embedding.')
-    parser.add_argument('--action-dim', type=int, default=4, help='Dimensionality of action space.')
-    parser.add_argument('--num-objects', type=int, default=5, help='Number of object slots in model.')
+    parser.add_argument('--embedding-dim', type=int, default=4, help='Dimensionality of embedding.')
+    parser.add_argument('--action-dim', type=int, default=6, help='Dimensionality of action space.')
+    parser.add_argument('--num-objects', type=int, default=3, help='Number of object slots in model.')
     parser.add_argument('--ignore-action', action='store_true', default=False, help='Ignore action in GNN transition model.')
-    parser.add_argument('--copy-action', action='store_true', default=False, help='Apply same action to all object slots.')
+    parser.add_argument('--copy-action', action='store_true', default=True, help='Apply same action to all object slots.')
     
     # Decoder parameters
     parser.add_argument('--decoder', action='store_true', default=False, help='Use decoder and pixel-based loss.')
@@ -105,14 +226,18 @@ def main():
         copy_action=args.copy_action,
         encoder=args.encoder
     ).to(device)
-    
+    # model = SpaceToPong(num_actions=args.action_dim).to(device)
+
+
     # Initialize weights (optional, since we are loading pre-trained weights)
     model.apply(utils.weights_init)
     
     # Load pre-trained weights
     print(f'Loading pre-trained model from {args.pretrained_model}...')
     pretrained_state = torch.load(args.pretrained_model, map_location=device)
-    model.load_state_dict(pretrained_state)
+    filtered_state = {k: v for k, v in pretrained_state.items() if 'some_layer' not in k}
+    model.load_state_dict(filtered_state, strict=False)
+    # model.load_state_dict(pretrained_state, strict=False)
     
     # Optionally freeze encoder layers to retain learned features
     freeze_encoder = True
@@ -187,11 +312,20 @@ def main():
                 optimizer_dec.zero_grad()
                 obs, action, next_obs = data_batch
                 objs = model.obj_extractor(obs)
+                # print(f"Shape of objs: {objs.shape}")
+                # print(f"Shape of obs: {obs.shape}")
+                # print(f"Shape of action: {action.shape}")
+                # Take a random 100 features of the objs vector
+                # objs = objs.view(objs.size(0), -1)  
+                # indices = torch.randperm(objs.size(1))[:100]  # Get random 100 indices
+                # objs = objs[:, indices]  # Select the random 100 features
                 state = model.obj_encoder(objs)
+
+                print(f"Shape of state: {state.shape}")
                 
                 rec = torch.sigmoid(decoder(state))
                 loss = F.binary_cross_entropy(rec, obs, reduction='sum') / obs.size(0)
-                
+
                 next_state_pred = state + model.transition_model(state, action)
                 next_rec = torch.sigmoid(decoder(next_state_pred))
                 next_loss = F.binary_cross_entropy(next_rec, next_obs, reduction='sum') / obs.size(0)
@@ -199,17 +333,17 @@ def main():
             else:
                 obs, action, next_obs = data_batch
                 loss = model.contrastive_loss(obs, action, next_obs)
-            
+			
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
             if args.decoder:
                 optimizer_dec.step()
-            
+			
             if batch_idx % args.log_interval == 0:
                 print(f'Epoch: {epoch} [{batch_idx * len(data_batch[0])}/{len(train_loader.dataset)} '
-                      f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item() / len(data_batch[0]):.6f}')
-            
+                        f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item() / len(data_batch[0]):.6f}')
+			
             step += 1
         
         avg_loss = train_loss / len(train_loader.dataset)
