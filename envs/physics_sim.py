@@ -78,14 +78,15 @@ def generate_3_body_problem_dataset(dest,
                                     seq_len,
                                     img_size=None,
                                     radius=3,
-                                    dt=0.3,
+                                    dt=0.5,
+                                    display_dt=2.0,
                                     g=9.8,
-                                    m=1.0,
+                                    masses=None,
                                     vx0_max=0.0,
                                     vy0_max=0.0,
                                     color=False,
                                     cifar_background=False,
-                                    ode_steps=10,
+                                    ode_steps=15,
                                     seed=0):
     np.random.seed(seed)
 
@@ -103,6 +104,10 @@ def generate_3_body_problem_dataset(dest,
     scale = 10
     scaled_img_size = [img_size[0] * scale, img_size[1] * scale]
 
+    if masses is None:
+        masses = [1.0, 1.0, 1.0]
+    assert len(masses) == 3, "Must provide exactly 3 masses"
+
     def generate_sequence():
         # sample initial position of the center of mass, then sample
         # position of each object relative to that.
@@ -110,6 +115,8 @@ def generate_3_body_problem_dataset(dest,
         collision = True
         while collision == True:
             seq = []
+            accumulated_time = 0.0
+            next_frame_time = 0.0
 
             cm_pos = np.random.rand(2)
             cm_pos = np.array(img_size) / 2
@@ -138,34 +145,13 @@ def generate_3_body_problem_dataset(dest,
             if cifar_background:
                 cifar_img = x_train[np.random.randint(50000)]
 
-            for i in range(seq_len):
-                if cifar_background:
-                    frame = cifar_img
-                    frame = rgb2gray(frame) / 255
-                    frame = resize(frame, scaled_img_size)
-                    frame = np.clip(frame - 0.2, 0.0, 1.0)  # darken image a bit
-                else:
-                    if color:
-                        frame = np.zeros(scaled_img_size + [3],
-                                         dtype=np.float32)
-                    else:
-                        frame = np.zeros(scaled_img_size + [1],
-                                         dtype=np.float32)
+            # Save initial frame
+            frame = create_frame(poss, cifar_background, cifar_img if cifar_background else None)
+            seq.append(frame)
+            next_frame_time += display_dt
 
-                for j, pos in enumerate(poss):
-                    # rr, cc = circle(int(pos[1] * scale), int(pos[0] * scale),
-                    #                 radius * scale, scaled_img_size)
-                    rr, cc = disk((int(pos[1] * scale), int(pos[0] * scale)), radius * scale, shape=scaled_img_size)
-                    if color:
-                        frame[rr, cc, 2 - j] = 1.0
-                    else:
-                        frame[rr, cc, 0] = 1.0
-
-                frame = resize(frame, img_size, anti_aliasing=True)
-                frame = (frame * 255).astype(np.uint8)
-
-                seq.append(frame)
-
+            # Simulate for seq_len-1 more frames
+            while len(seq) < seq_len:
                 # rollout physics
                 for _ in range(ode_steps):
                     norm01 = np.linalg.norm(poss[0] - poss[1])
@@ -175,27 +161,66 @@ def generate_3_body_problem_dataset(dest,
                     vec12 = (poss[1] - poss[2])
                     vec20 = (poss[2] - poss[0])
 
-                    # Compute force vectors
-                    F = [vec01 / norm01 ** 3 - vec20 / norm20 ** 3,
-                         vec12 / norm12 ** 3 - vec01 / norm01 ** 3,
-                         vec20 / norm20 ** 3 - vec12 / norm12 ** 3]
+                    # Compute force vectors with individual masses
+                    F = [masses[1]*vec01/norm01**3 - masses[2]*vec20/norm20**3,
+                         masses[2]*vec12/norm12**3 - masses[0]*vec01/norm01**3,
+                         masses[0]*vec20/norm20**3 - masses[1]*vec12/norm12**3]
                     F = np.array(F)
-                    F = -g * m * m * F
+                    F = -g * F
 
-                    vels = vels + dt / ode_steps * F
+                    # Update velocities using F=ma (different mass for each body)
+                    vels = vels + dt/ode_steps * (F / np.array(masses)[:, np.newaxis])
                     poss = poss + dt / ode_steps * vels
 
                     collision = any(
                         [verify_wall_collision(pos, vel, radius, img_size) for
                          pos, vel in zip(poss, vels)]) or \
                                 verify_object_collision(poss, radius + 1)
+                    
                     if collision:
                         break
 
                 if collision:
                     break
 
-        return seq
+                accumulated_time += dt
+                
+                # Check if we should save a frame
+                if accumulated_time >= next_frame_time:
+                    frame = create_frame(poss, cifar_background, cifar_img if cifar_background else None)
+                    seq.append(frame)
+                    next_frame_time += display_dt
+
+            if not collision and len(seq) == seq_len:
+                break
+
+        return np.array(seq)
+
+    def create_frame(poss, cifar_background, cifar_img=None):
+        if cifar_background:
+            frame = cifar_img
+            frame = rgb2gray(frame) / 255
+            frame = resize(frame, scaled_img_size)
+            frame = np.clip(frame - 0.2, 0.0, 1.0)  # darken image a bit
+        else:
+            if color:
+                frame = np.zeros(scaled_img_size + [3],
+                                 dtype=np.float32)
+            else:
+                frame = np.zeros(scaled_img_size + [1],
+                                 dtype=np.float32)
+
+        for j, pos in enumerate(poss):
+            rr, cc = disk((int(pos[1] * scale), int(pos[0] * scale)), 
+                         radius * scale, shape=scaled_img_size)
+            if color:
+                frame[rr, cc, 2 - j] = 1.0
+            else:
+                frame[rr, cc, 0] = 1.0
+
+        frame = resize(frame, img_size, anti_aliasing=True)
+        frame = (frame * 255).astype(np.uint8)
+        return frame
 
     sequences = []
     for i in range(train_set_size + valid_set_size + test_set_size):

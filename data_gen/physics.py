@@ -39,10 +39,13 @@ physics_sim.generate_3_body_problem_dataset(
     test_set_size=2,
     seq_len=12,
     img_size=[50, 50],
-    dt=2.0,
+    dt=0.6,             # Can be slightly larger than 0.5 since mass ratio is smaller
+    display_dt=1.5,     # Show frames every 1.5 time units for smooth visualization
+    masses=[1.0, 2.0, 3.0],
     vx0_max=0.5,
     vy0_max=0.5,
     color=True,
+    ode_steps=12,      # Can be slightly reduced from 15 since system is less extreme
     seed=args.seed
 )
 
