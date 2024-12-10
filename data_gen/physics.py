@@ -1,68 +1,107 @@
 import sys
 import os
+from pathlib import Path
+import numpy as np
+import argparse
 import h5py
 
-
-# Get env directory
-from pathlib import Path
+# Add current working directory to path
 if str(Path.cwd()) not in sys.path:
     sys.path.insert(0, str(Path.cwd()))
 
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'envs')))
-
 from envs import physics_sim
-import numpy as np
-import argparse
-
 from utils import save_list_dict_h5py
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--fname', type=str,
-                    default='data',
-                    help='File name / path.')
-parser.add_argument('--num-episodes', type=int, default=1000,
-                    help='Number of episodes to generate.')
-parser.add_argument('--seed', type=int, default=0,
-                    help='Random seed.')
-parser.add_argument('--eval', action='store_true', default=False,
-                    help='Create evaluation set.')
+def str_to_list(s):
+    """Convert string representation of list to actual list of floats"""
+    try:
+        # Remove brackets and split by comma
+        values = s.strip('[]').split(',')
+        return [float(x.strip()) for x in values]
+    except:
+        return None
 
-args = parser.parse_args()
 
-np.random.seed(args.seed)
+def main():
+    parser = argparse.ArgumentParser(description='Generate n-body physics simulation dataset')
+    parser.add_argument('--fname', type=str, default='data',
+                        help='File name / path.')
+    parser.add_argument('--num-episodes', type=int, default=1000,
+                        help='Number of episodes to generate.')
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Random seed.')
+    parser.add_argument('--eval', action='store_true', default=False,
+                        help='Create evaluation set.')
+    parser.add_argument('--num-bodies', type=int, default=3, choices=[2, 3],
+                        help='Number of bodies to simulate (2 or 3).')
+    parser.add_argument('--masses', type=str, default=None,
+                        help='Comma-separated masses of the bodies (e.g., "1.0,1.0,1.0").')
+    parser.add_argument('--seq-len', type=int, default=12,
+                        help='Length of each sequence.')
+    parser.add_argument('--img-size', type=int, default=50,
+                        help='Size of the square image (width=height).')
+    
+    args = parser.parse_args()
 
-physics_sim.generate_3_body_problem_dataset(
-    dest=args.fname + '.npz',
-    train_set_size=args.num_episodes,
-    valid_set_size=2,
-    test_set_size=2,
-    seq_len=12,
-    img_size=[50, 50],
-    dt=2.0,
-    vx0_max=0.5,
-    vy0_max=0.5,
-    color=True,
-    seed=args.seed
-)
+    # Set random seed
+    np.random.seed(args.seed)
 
-# data shape: (num_samples, num_steps, x_shape, y_shape, num_channels)
+    # Parse masses
+    if args.masses is None:
+        masses = [1.0] * args.num_bodies
+    else:
+        masses = str_to_list(args.masses)
+        if masses is None or len(masses) != args.num_bodies:
+            raise ValueError(f"Invalid masses format. Please provide {args.num_bodies} comma-separated values.")
 
-data = np.load(args.fname + '.npz')
+    # Generate dataset
+    physics_sim.generate_nbody_problem_dataset(
+        dest=args.fname + '.npz',
+        n_bodies=args.num_bodies,
+        train_set_size=args.num_episodes,
+        valid_set_size=2,
+        test_set_size=2,
+        seq_len=args.seq_len,
+        img_size=[args.img_size, args.img_size],
+        masses=masses,
+        vx0_max=0.5,
+        vy0_max=0.5,
+        color=True,
+        seed=args.seed
+    )
 
-train_x = np.concatenate(
-    (data['train_x'][:, :-1], data['train_x'][:, 1:]), axis=-1)
-train_x = np.transpose(train_x, (0, 1, 4, 2, 3)) / 255.
+    # Load and process data
+    try:
+        with np.load(args.fname + '.npz') as data:
+            # Shape: (num_samples, num_steps, height, width, channels)
+            train_x = data['train_x']
+            
+            # Create pairs of consecutive frames
+            # New shape: (num_samples, num_steps-1, channels*2, height, width)
+            train_pairs = np.concatenate(
+                (train_x[:, :-1], train_x[:, 1:]), 
+                axis=-1
+            )
+            train_pairs = np.transpose(train_pairs, (0, 1, 4, 2, 3)) / 255.
 
-replay_buffer = []
+            # Create replay buffer
+            replay_buffer = []
+            for idx in range(train_x.shape[0]):
+                sample = {
+                    'obs': train_pairs[idx, :-1],
+                    'next_obs': train_pairs[idx, 1:],
+                    'action': np.zeros(train_pairs.shape[1] - 1, dtype=np.int64)
+                }
+                replay_buffer.append(sample)
 
-for idx in range(data['train_x'].shape[0]):
-    sample = {
-        'obs': train_x[idx, :-1],
-        'next_obs': train_x[idx, 1:],
-        'action': np.zeros((train_x.shape[1] - 1), dtype=np.int64)
-    }
+            # Save to H5 file
+            save_list_dict_h5py(replay_buffer, args.fname)
+            
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        sys.exit(1)
 
-    replay_buffer.append(sample)
 
-save_list_dict_h5py(replay_buffer, args.fname)
+if __name__ == "__main__":
+    main()
